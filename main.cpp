@@ -2,6 +2,7 @@
 #include "main.h"
 
 using std::vector;
+using std::make_shared;
 
 Point::Point(int x0, int y0) {
 	x = x0;               
@@ -9,35 +10,43 @@ Point::Point(int x0, int y0) {
 }
 
 void GameManager::ChangeKnightDirection(Point dir) {
-	knihhtPointer->SetDirection(dir);
+	_level.knightPointer->SetDirection(dir);
 }
 
-void GameManager::AddCharacter(Character* &c) {
+void Level::AddCharacter(shared_ptr<Character> c) {
 	map[c->Position().x][c->Position().y] = c;
 	characterList.push_back(c);
 }
 
+Level::Level(int height, int weight) {
+	map.resize(height, vector<shared_ptr<Character>>(weight));
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < weight; j++) {
+			map[i][j] = make_shared<Floor>();
+		}
+	}
+	knightPointer = make_shared<Knight>(Point(0, 0));
+	AddCharacter(knightPointer);
+	AddCharacter(make_shared<Dragon>(Point(1, 0)));
+}
+
 GameManager::GameManager(){
-	map.resize(5, vector<Character*>(5, new Character()));
-	knihhtPointer = new Knight(Point(0, 0));
-	map[0][0] = knihhtPointer;
-	Dragon* d = new Dragon(Point(4, 4));
-	map[4][4] = d;
-	characterList.push_back(knihhtPointer);
-	characterList.push_back(d);
-}                   //вынести константы(мб добавить генерацию уровней)
+	_level = Level(5, 5);
+}                  
 
 void GameManager::Turn() {
-	for (int i = 0; i < characterList.size(); i++) {
-		characterList[i]->Move(map);
+	for (int i = 0; i < _level.characterList.size(); i++) {
+		if (!_level.characterList[i]->IsDead()) {
+			_level.characterList[i]->Move(_level.map);
+		}
 	}
 }
 
 const void GameManager::Draw() {
 	clear();
-	for (int i = 0; i < map.size(); i++) {
-		for (int j = 0; j < map[0].size(); j++) {
-			printw(map[i][j]->Symbol());
+	for (int i = 0; i < _level.map.size(); i++) {
+		for (int j = 0; j < _level.map[0].size(); j++) {
+			printw(_level.map[i][j]->Symbol());
 		}
 		printw("\n");
 	}
@@ -45,36 +54,48 @@ const void GameManager::Draw() {
 }
 
 Character::Character(Point pos) {
-	position = pos;
+	_position = pos;
+	_isDead = false;
 }
 
 const int Character::HitPoints() {
-	return hp;
+	return _hp;
 }
 
 const int Character::Damage() {
-	return dmg;
+	return _dmg;
 }
 
 const Point Character::Position() {
-	return position;
+	return _position;
 }
 
 const char* Character::Symbol() {
-	return symbol;
+	return _symbol;
+}
+
+const bool Character::IsDead() {
+	return _isDead;
+}
+
+void Character::TakeDamage(int damage) {
+	_hp -= damage;
+	if (_hp <= 0) {
+		_isDead = true;
+	}
 }
 
 Wall::Wall(Point pos) :
 	Character(pos){
-	symbol = "#";
-	hp = INT16_MAX;           //вынести константы
-	dmg = 0;
+	_symbol = "#";
+	_hp = INT16_MAX;           
+	_dmg = 0;
 }
 
 Movable::Movable(Point pos) :
 	Character(pos) {}
 
-void Movable::Move(vector<vector<Character*>> &map) {
+void Movable::Move(vector<vector<shared_ptr<Character>>> &map) {
 	Point direction;
 	do {
 		int way = rand() % 4;
@@ -93,43 +114,54 @@ void Movable::Move(vector<vector<Character*>> &map) {
 			direction = Point(-1, 0);
 			break;
 		}
-	} while ((position.x + direction.x >= map.size()) || (position.x + direction.x < 0) ||
-		(position.y + direction.y >= map[0].size()) || (position.y + direction.y < 0) ||
-		(map[position.x + direction.x][position.y + direction.y]->Symbol() != "."));
-	std::swap(map[position.x][position.y], map[position.x + direction.x][position.y + direction.y]);
-	position.x += direction.x;
-	position.y += direction.y;
+	} while ((_position.x + direction.x >= map.size()) || (_position.x + direction.x < 0) ||
+		(_position.y + direction.y >= map[0].size()) || (_position.y + direction.y < 0));
+		this->Collide(*map[_position.x + direction.x][_position.y + direction.y]);
+	if (map[_position.x + direction.x][_position.y + direction.y]->IsDead()) {
+		map[_position.x + direction.x][_position.y + direction.y] = make_shared<Floor>();
+	}
+	if (map[_position.x + direction.x][_position.y + direction.y]->Symbol() == ".") {
+		std::swap(map[_position.x][_position.y], map[_position.x + direction.x][_position.y + direction.y]);
+		_position.x += direction.x;
+		_position.y += direction.y;
+	}
 }
 
 Knight::Knight(Point pos) :
 	Character(pos) {
-	symbol = "K";
-	hp = 300;                   //вынести константы
-	dmg = 50;
-	direction = Point(0, 0);
+	_symbol = "K";
+	_hp = 300;                   
+	_dmg = 50;
+	_direction = Point(0, 0);
 }
 
-void Knight::Move(vector<vector<Character*>> &map) {
-	if ((position.x + direction.x < map.size()) && (position.x + direction.x >= 0) && (position.y + direction.y < map[0].size()) && (position.y + direction.y >= 0)) {
-		std::swap(map[position.x][position.y], map[position.x + direction.x][position.y + direction.y]);
-		position.x += direction.x;
-		position.y += direction.y;
+void Knight::Move(vector<vector<shared_ptr<Character>>> &map) {
+	if ((_position.x + _direction.x < map.size()) && (_position.x + _direction.x >= 0) && (_position.y + _direction.y < map[0].size()) && (_position.y + _direction.y >= 0)) {
+			this->Collide(*map[_position.x + _direction.x][_position.y + _direction.y]);
+		if (map[_position.x + _direction.x][_position.y + _direction.y]->IsDead()) {
+			map[_position.x + _direction.x][_position.y + _direction.y] = make_shared<Floor>();
+		}
+		if (map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
+			std::swap(map[_position.x][_position.y], map[_position.x + _direction.x][_position.y + _direction.y]);
+			_position.x += _direction.x;
+			_position.y += _direction.y;
+		}
 	}
 }
 
 void Knight::SetDirection(Point dir) {
-	direction = dir;
+	_direction = dir;
 }
 
 Princess::Princess(Point pos) :
 	Character(pos) {
-	symbol = "P";
-	hp = 100;                  //вынести константы 
-	dmg = 0;
+	_symbol = "P";
+	_hp = 100;                  
+	_dmg = 0;
 }
 
-void Princess::Move(vector<vector<Character*>> &map) {
-	//подумать как она ходит 
+void Princess::Move(vector<vector<shared_ptr<Character>>> &map) {
+	// 
 }
 
 Monster::Monster(Point pos) :
@@ -137,16 +169,64 @@ Monster::Monster(Point pos) :
 
 Dragon::Dragon(Point pos) :
 	Monster(pos) {
-	symbol = "D";
-	hp = 1000;                 //вынести константы 
-	dmg = 5;
+	_symbol = "D";
+	_hp = 1000;                  
+	_dmg = 5;
 }
 
 Zombie::Zombie(Point pos) :
 	Monster(pos) {
-	symbol = "Z";
-	hp = 100;
-	dmg = 2;                      //вынести константы 
+	_symbol = "Z";
+	_hp = 100;
+	_dmg = 2;                    
+}
+
+void Character::Collide(Knight &other) {
+	return other.Collide(*this);
+}
+
+void Character::Collide(Monster &other) {
+	return other.Collide(*this);
+}
+
+void Character::Collide(Princess &other) {
+	return other.Collide(*this);
+}
+
+void Knight::Collide(Character &other) {
+	return other.Collide(*this);
+}
+
+void Knight::Collide(Monster &other) {
+	other.TakeDamage(this->_dmg);
+}
+
+void Knight::Collide(Princess &other) {
+	//Победа?
+}
+
+void Monster::Collide(Character &other) {
+	return other.Collide(*this);
+}
+
+void Monster::Collide(Knight &other) {
+	other.TakeDamage(this->_dmg);
+}
+
+void Monster::Collide(Princess &other) {
+	//Можно ли проиграть при смерти принцессы?
+}
+
+void Princess::Collide(Character &other) {
+	return other.Collide(*this);
+}
+
+void Princess::Collide(Knight &other) {
+	//Если она не двигается, то у нее нет коллижинов?
+}
+
+void Princess::Collide(Monster &other) {
+	//Если она не двигается, то у нее нет коллижинов?
 }
 
 int main() {
@@ -181,7 +261,7 @@ int main() {
 			g.Draw();
 		}
 	}
-	endwin();                    
+	endwin(); 
 
 	return 0;
 }
