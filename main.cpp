@@ -4,10 +4,7 @@
 using std::vector;
 using std::make_shared;
 
-Point::Point(int x0, int y0) {
-	x = x0;               
-	y = y0;
-}
+Point::Point(int x0, int y0) : x(x0), y(y0) {}
 
 void GameManager::ChangeKnightDirection(Point dir) {
 	_level.knightPointer->SetDirection(dir);
@@ -28,22 +25,36 @@ Level::Level(int height, int weight) {
 	knightPointer = make_shared<Knight>(Point(0, 0));
 	AddCharacter(knightPointer);
 	AddCharacter(make_shared<Dragon>(Point(1, 0)));
+	AddCharacter(make_shared<HealingPotion>(Point(0, 1)));
+	AddCharacter(make_shared<Wall>(Point(2, 2)));
 }
 
 GameManager::GameManager(){
-	_level = Level(5, 5);
+	_level = Level(8, 8);
 }                  
 
 void GameManager::Turn() {
+	for (int i = 0; i < _level.projectilesList.size(); i++) {
+		if (!_level.projectilesList[i]->IsDead()) {
+			_level.projectilesList[i]->Move(_level);
+		}
+	}
 	for (int i = 0; i < _level.characterList.size(); i++) {
 		if (!_level.characterList[i]->IsDead()) {
-			_level.characterList[i]->Move(_level.map);
+			_level.characterList[i]->Move(_level);
 		}
 	}
 }
 
 const void GameManager::Draw() {
 	clear();
+	char c[10];
+	sprintf(c, "%d", _level.knightPointer->HitPoints());
+	printw(c);
+	printw("\n");
+	sprintf(c, "%d", _level.knightPointer->ManaPoits());
+	printw(c);
+	printw("\n");
 	for (int i = 0; i < _level.map.size(); i++) {
 		for (int j = 0; j < _level.map[0].size(); j++) {
 			printw(_level.map[i][j]->Symbol());
@@ -53,28 +64,33 @@ const void GameManager::Draw() {
 	refresh();
 }
 
-Character::Character(Point pos) {
-	_position = pos;
-	_isDead = false;
+void GameManager::SetKnightFire() {
+	_level.knightPointer->SetFire();
 }
 
-const int Character::HitPoints() {
+Character::Character(Point pos) : _position(pos), _isDead(false) {}
+
+int Character::HitPoints() const {
 	return _hp;
 }
 
-const int Character::Damage() {
+int Character::ManaPoits() const {
+	return _mp;
+}
+
+int Character::Damage() const {
 	return _dmg;
 }
 
-const Point Character::Position() {
+Point Character::Position() const {
 	return _position;
 }
 
-const char* Character::Symbol() {
+char* Character::Symbol() const {
 	return _symbol;
 }
 
-const bool Character::IsDead() {
+bool Character::IsDead() const {
 	return _isDead;
 }
 
@@ -85,17 +101,17 @@ void Character::TakeDamage(int damage) {
 	}
 }
 
-Wall::Wall(Point pos) :
-	Character(pos){
+Wall::Wall(Point pos) : Character(pos){
 	_symbol = "#";
-	_hp = INT16_MAX;           
+	_hp = INT16_MAX;  
+	_mp = 0;
 	_dmg = 0;
 }
 
 Movable::Movable(Point pos) :
 	Character(pos) {}
 
-void Movable::Move(vector<vector<shared_ptr<Character>>> &map) {
+void Movable::Move(Level &level) {
 	Point direction;
 	do {
 		int way = rand() % 4;
@@ -114,14 +130,14 @@ void Movable::Move(vector<vector<shared_ptr<Character>>> &map) {
 			direction = Point(-1, 0);
 			break;
 		}
-	} while ((_position.x + direction.x >= map.size()) || (_position.x + direction.x < 0) ||
-		(_position.y + direction.y >= map[0].size()) || (_position.y + direction.y < 0));
-		this->Collide(*map[_position.x + direction.x][_position.y + direction.y]);
-	if (map[_position.x + direction.x][_position.y + direction.y]->IsDead()) {
-		map[_position.x + direction.x][_position.y + direction.y] = make_shared<Floor>();
+	} while ((_position.x + direction.x >= level.map.size()) || (_position.x + direction.x < 0) ||
+		(_position.y + direction.y >= level.map[0].size()) || (_position.y + direction.y < 0));
+		this->Collide(*level.map[_position.x + direction.x][_position.y + direction.y]);
+	if (level.map[_position.x + direction.x][_position.y + direction.y]->IsDead()) {
+		level.map[_position.x + direction.x][_position.y + direction.y] = make_shared<Floor>();
 	}
-	if (map[_position.x + direction.x][_position.y + direction.y]->Symbol() == ".") {
-		std::swap(map[_position.x][_position.y], map[_position.x + direction.x][_position.y + direction.y]);
+	if (level.map[_position.x + direction.x][_position.y + direction.y]->Symbol() == ".") {
+		std::swap(level.map[_position.x][_position.y], level.map[_position.x + direction.x][_position.y + direction.y]);
 		_position.x += direction.x;
 		_position.y += direction.y;
 	}
@@ -130,19 +146,27 @@ void Movable::Move(vector<vector<shared_ptr<Character>>> &map) {
 Knight::Knight(Point pos) :
 	Character(pos) {
 	_symbol = "K";
-	_hp = 300;                   
+	_hp = 300;  
+	_mp = 100;
 	_dmg = 50;
 	_direction = Point(0, 0);
+	_fireAtCurrentTurn = false;
 }
 
-void Knight::Move(vector<vector<shared_ptr<Character>>> &map) {
-	if ((_position.x + _direction.x < map.size()) && (_position.x + _direction.x >= 0) && (_position.y + _direction.y < map[0].size()) && (_position.y + _direction.y >= 0)) {
-			this->Collide(*map[_position.x + _direction.x][_position.y + _direction.y]);
-		if (map[_position.x + _direction.x][_position.y + _direction.y]->IsDead()) {
-			map[_position.x + _direction.x][_position.y + _direction.y] = make_shared<Floor>();
+void Knight::Move(Level &level) {
+	if (_fireAtCurrentTurn) {
+		_fireAtCurrentTurn = false;
+		CreateFireball(level);
+		return;
+	}
+	if ((_position.x + _direction.x < level.map.size()) && (_position.x + _direction.x >= 0) && 
+		(_position.y + _direction.y < level.map[0].size()) && (_position.y + _direction.y >= 0)) {
+			this->Collide(*level.map[_position.x + _direction.x][_position.y + _direction.y]);
+		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->IsDead()) {
+			level.map[_position.x + _direction.x][_position.y + _direction.y] = make_shared<Floor>();
 		}
-		if (map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
-			std::swap(map[_position.x][_position.y], map[_position.x + _direction.x][_position.y + _direction.y]);
+		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
+			std::swap(level.map[_position.x][_position.y], level.map[_position.x + _direction.x][_position.y + _direction.y]);
 			_position.x += _direction.x;
 			_position.y += _direction.y;
 		}
@@ -153,14 +177,34 @@ void Knight::SetDirection(Point dir) {
 	_direction = dir;
 }
 
+void Knight::CreateFireball(Level &level) {
+	int x = _position.x + _direction.x;
+	int y = _position.y + _direction.y;
+	if ((x < level.map.size()) && (x >= 0) && (y < level.map[0].size()) && (y >= 0)) {
+		level.projectilesList.push_back(make_shared<Fireball>(Point(x, y), _direction));
+		level.map[x][y]->Collide(*level.projectilesList.back());
+		if (level.map[x][y]->IsDead()) {
+			level.map[x][y] = make_shared<Floor>();
+		}
+		if (!level.projectilesList.back()->IsDead()) {
+			level.map[x][y] = level.projectilesList.back();
+		}
+	}
+}
+
+void Knight::SetFire() {
+	_fireAtCurrentTurn = true;
+}
+
 Princess::Princess(Point pos) :
 	Character(pos) {
 	_symbol = "P";
-	_hp = 100;                  
+	_hp = 100;   
+	_mp = 0;
 	_dmg = 0;
 }
 
-void Princess::Move(vector<vector<shared_ptr<Character>>> &map) {
+void Princess::Move(Level &level) {
 	// 
 }
 
@@ -170,7 +214,8 @@ Monster::Monster(Point pos) :
 Dragon::Dragon(Point pos) :
 	Monster(pos) {
 	_symbol = "D";
-	_hp = 1000;                  
+	_hp = 1000;
+	_mp = 0;
 	_dmg = 5;
 }
 
@@ -178,7 +223,52 @@ Zombie::Zombie(Point pos) :
 	Monster(pos) {
 	_symbol = "Z";
 	_hp = 100;
+	_mp = 0;
 	_dmg = 2;                    
+}
+
+Potion::Potion(Point pos) :
+	Character(pos) {}
+
+HealingPotion::HealingPotion(Point pos) :
+	Potion(pos) {
+	_hp = 50;
+	_symbol = "H";
+}
+
+Projectile::Projectile(Point pos, Point direction):
+Character(pos){
+	_direction = direction;
+}
+
+void Projectile::Move(Level &level) {
+	if ((_position.x + _direction.x < level.map.size()) && (_position.x + _direction.x >= 0) &&
+		(_position.y + _direction.y < level.map[0].size()) && (_position.y + _direction.y >= 0)) {
+		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
+			std::swap(level.map[_position.x][_position.y], level.map[_position.x + _direction.x][_position.y + _direction.y]);
+			_position.x += _direction.x;
+			_position.y += _direction.y;
+		}
+		else {
+			this->Collide(*level.map[_position.x + _direction.x][_position.y + _direction.y]);
+			if (level.map[_position.x + _direction.x][_position.y + _direction.y]->IsDead()) {
+				level.map[_position.x + _direction.x][_position.y + _direction.y] = make_shared<Floor>();
+			}
+			if (_isDead) {
+				level.map[_position.x][_position.y] = make_shared<Floor>();
+			}
+		}
+	}
+	else {
+		level.map[_position.x][_position.y] = make_shared<Floor>();
+		_isDead = true;
+	}
+}
+
+Fireball::Fireball(Point pos, Point direction):
+Projectile(pos, direction){
+	_hp = 50;
+	_symbol = "*";
 }
 
 void Character::Collide(Knight &other) {
@@ -193,12 +283,20 @@ void Character::Collide(Princess &other) {
 	return other.Collide(*this);
 }
 
-void Knight::Collide(Character &other) {
+void Character::Collide(Potion &other) {
 	return other.Collide(*this);
 }
 
+void Character::Collide(Projectile &other) {
+	other.Collide(*this);
+}
+
+void Knight::Collide(Character &other) {
+	other.Collide(*this);
+}
+
 void Knight::Collide(Monster &other) {
-	other.TakeDamage(this->_dmg);
+	other.TakeDamage(_dmg);
 }
 
 void Knight::Collide(Princess &other) {
@@ -206,15 +304,19 @@ void Knight::Collide(Princess &other) {
 }
 
 void Monster::Collide(Character &other) {
-	return other.Collide(*this);
+	other.Collide(*this);
 }
 
 void Monster::Collide(Knight &other) {
-	other.TakeDamage(this->_dmg);
+	other.TakeDamage(_dmg);
 }
 
 void Monster::Collide(Princess &other) {
 	//ћожно ли проиграть при смерти принцессы?
+}
+
+void Monster::Collide(Projectile &other) {
+	other.Collide(*this);
 }
 
 void Princess::Collide(Character &other) {
@@ -229,6 +331,33 @@ void Princess::Collide(Monster &other) {
 	//≈сли она не двигаетс€, то у нее нет коллижинов?
 }
 
+void Potion::Collide(Character &other) {
+	other.Collide(*this);
+}
+
+void Potion::Collide(Knight &other) {
+	other.Collide(*this);
+}
+
+void HealingPotion::Collide(Character &other) {
+	other.Collide(*this);
+}
+
+void HealingPotion::Collide(Knight &other) {
+	other.TakeDamage(-_hp);
+	_isDead = true;
+}
+
+void Projectile::Collide(Character &other) {
+	other.Collide(*this);
+}
+
+void Projectile::Collide(Monster &other) {
+	other.TakeDamage(_hp);
+	_isDead = true;
+}
+
+
 int main() {
 	initscr();                  
 	/*start_color();
@@ -241,7 +370,7 @@ int main() {
 	raw();
 	while (true){
 		int ch = getch();
-		if ((ch == 119) || (ch == 115) || (ch == 100) || (ch == 97)) {
+		if ((ch == 119) || (ch == 115) || (ch == 100) || (ch == 97) || (ch == 32)) {
 			switch (ch)
 			{
 			case 119:
@@ -255,6 +384,9 @@ int main() {
 				break;
 			case 97:
 				g.ChangeKnightDirection(Point(0, -1));
+				break;
+			case 32:
+				g.SetKnightFire();
 				break;
 			}
 			g.Turn();
