@@ -1,6 +1,8 @@
 #include "curses.h"
 #include "main.h"
 
+#include <fstream>
+
 using std::vector;
 using std::make_shared;
 
@@ -15,22 +17,34 @@ void Level::AddCharacter(shared_ptr<Character> c) {
 	characterList.push_back(c);
 }
 
-Level::Level(int height, int weight) {
-	map.resize(height, vector<shared_ptr<Character>>(weight));
+Level::Level() {
+	std::ifstream file;
+	file.open("map.txt");
+	int height, width, knightX, knightY;
+	file >> height >> width;
+	file >> knightX >> knightY;
+	map.resize(height, vector<shared_ptr<Character>>(width));
+	CharacterFactory factory;
+	char c;
 	for (int i = 0; i < height; i++) {
-		for (int j = 0; j < weight; j++) {
-			map[i][j] = make_shared<Floor>();
+		for (int j = 0; j < width; j++) {
+			file >> c;
+			if ((i == knightX - 1) && (j == knightY - 1)) {
+				knightPointer = make_shared<Knight>(Point(i, j));
+				map[i][j] = knightPointer;
+			}
+			else {
+				map[i][j] = factory.create(c, Point(i, j));
+			}
+			if (map[i][j]->IsPlayable()) {
+				characterList.push_back(map[i][j]);
+			}
 		}
 	}
-	knightPointer = make_shared<Knight>(Point(0, 0));
-	AddCharacter(knightPointer);
-	AddCharacter(make_shared<Dragon>(Point(1, 0)));
-	AddCharacter(make_shared<HealingPotion>(Point(0, 1)));
-	AddCharacter(make_shared<Wall>(Point(2, 2)));
 }
 
 GameManager::GameManager(){
-	_level = Level(8, 8);
+	_level = Level();
 }                  
 
 void GameManager::Turn() {
@@ -94,6 +108,10 @@ bool Character::IsDead() const {
 	return _isDead;
 }
 
+bool Character::IsPlayable() const {
+	return _isPlayable;
+}
+
 void Character::TakeDamage(int damage) {
 	_hp -= damage;
 	if (_hp <= 0) {
@@ -106,6 +124,7 @@ Wall::Wall(Point pos) : Character(pos){
 	_hp = INT16_MAX;  
 	_mp = 0;
 	_dmg = 0;
+	_isPlayable = false;
 }
 
 Movable::Movable(Point pos) :
@@ -149,6 +168,7 @@ Knight::Knight(Point pos) :
 	_hp = 300;  
 	_mp = 100;
 	_dmg = 50;
+	_isPlayable = true;
 	_direction = Point(0, 0);
 	_fireAtCurrentTurn = false;
 }
@@ -202,6 +222,7 @@ Princess::Princess(Point pos) :
 	_hp = 100;   
 	_mp = 0;
 	_dmg = 0;
+	_isPlayable = true;
 }
 
 void Princess::Move(Level &level) {
@@ -217,6 +238,7 @@ Dragon::Dragon(Point pos) :
 	_hp = 1000;
 	_mp = 0;
 	_dmg = 5;
+	_isPlayable = true;
 }
 
 Zombie::Zombie(Point pos) :
@@ -224,7 +246,8 @@ Zombie::Zombie(Point pos) :
 	_symbol = "Z";
 	_hp = 100;
 	_mp = 0;
-	_dmg = 2;                    
+	_dmg = 2;
+	_isPlayable = true;
 }
 
 Potion::Potion(Point pos) :
@@ -269,6 +292,7 @@ Fireball::Fireball(Point pos, Point direction):
 Projectile(pos, direction){
 	_hp = 50;
 	_symbol = "*";
+	_isPlayable = true;
 }
 
 void Character::Collide(Knight &other) {
@@ -296,7 +320,7 @@ void Knight::Collide(Character &other) {
 }
 
 void Knight::Collide(Monster &other) {
-	other.TakeDamage(_dmg);
+	TakeDamage(_dmg);
 }
 
 void Knight::Collide(Princess &other) {
@@ -308,7 +332,7 @@ void Monster::Collide(Character &other) {
 }
 
 void Monster::Collide(Knight &other) {
-	other.TakeDamage(_dmg);
+	TakeDamage(_dmg);
 }
 
 void Monster::Collide(Princess &other) {
@@ -357,9 +381,18 @@ void Projectile::Collide(Monster &other) {
 	_isDead = true;
 }
 
+CharacterFactory::CharacterFactory() {
+	add_actor<Floor>();
+	add_actor<Wall>();
+	add_actor<Knight>();
+	add_actor<Princess>();
+	add_actor<HealingPotion>();
+	add_actor<Zombie>();
+	add_actor<Dragon>();
+}
 
-int main() {
-	initscr();                  
+int main() {  
+	initscr();
 	/*start_color();
 	init_pair(1, COLOR_RED, COLOR_BLACK);
 	init_pair(2, COLOR_WHITE, COLOR_BLACK);

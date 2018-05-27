@@ -1,6 +1,11 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <map>
+#include <functional>
+#include <chrono>
+#include <memory>
+#include <string>
 
 using std::vector;
 using std::shared_ptr;
@@ -30,8 +35,7 @@ public:
 
 class Level {
 public:
-	Level() {}
-	Level(int height, int weight);
+	Level();
 	vector<vector<shared_ptr<Character>>> map;
 	vector<shared_ptr<Character>> characterList;
 	shared_ptr<Knight> knightPointer;
@@ -61,6 +65,7 @@ public:
 	virtual Point Position() const;
 	virtual char* Symbol() const;
 	virtual bool IsDead() const;
+	virtual bool IsPlayable() const;
 	void TakeDamage(int damage);
 	virtual void Collide(Character &other) {};
 	virtual void Collide(Knight &other);
@@ -73,6 +78,7 @@ public:
 	virtual void Move(Level &level) {}
 protected:
 	bool _isDead;
+	bool _isPlayable;
 	char* _symbol = ".";
 	int _dmg;
 	int _hp;
@@ -92,6 +98,7 @@ public:
 class Floor : public Character {
 public:
 	Floor() {}
+	Floor(Point pos) {}
 	void Collide(Character &other) override {};
 	void Collide(Knight &other) override {}
 	void Collide(Monster &other) override {}
@@ -189,4 +196,29 @@ public:
 class Zombie : public Monster {
 public:
 	Zombie(Point pos);
+};
+
+template <class BaseT>
+class BaseFactory
+{
+public:
+    template <class ActorT>
+    void add_actor()
+    {
+        constructors_[*ActorT(Point(0, 0)).Symbol()] = [](Point pos){return new ActorT(pos);};
+    }
+
+    std::shared_ptr<BaseT> create(char symbol, Point pos)
+    {
+        return std::shared_ptr<BaseT>(constructors_[symbol](pos));
+    }
+
+private:
+    std::map<char, std::function<BaseT*(Point)>> constructors_;
+};
+
+class CharacterFactory : public BaseFactory<Character>
+{
+public:
+	explicit CharacterFactory();
 };
