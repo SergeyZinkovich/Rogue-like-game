@@ -1,10 +1,14 @@
 #include "curses.h"
 #include "main.h"
-
+#include "configReader.cpp"
 #include <fstream>
+#include <string>
 
 using std::vector;
 using std::make_shared;
+using std::string;
+
+ConfigReader config;
 
 Point::Point(int x0, int y0) : x(x0), y(y0) {}
 
@@ -71,7 +75,10 @@ const void GameManager::Draw() {
 	printw("\n");
 	for (int i = 0; i < _level.map.size(); i++) {
 		for (int j = 0; j < _level.map[0].size(); j++) {
-			printw(_level.map[i][j]->Symbol());
+			char k[2];
+			k[0] = _level.map[i][j]->Symbol();
+			k[1] = '\0';
+			printw(k);
 		}
 		printw("\n");
 	}
@@ -100,7 +107,7 @@ Point Character::Position() const {
 	return _position;
 }
 
-char* Character::Symbol() const {
+char Character::Symbol() const {
 	return _symbol;
 }
 
@@ -120,11 +127,12 @@ void Character::TakeDamage(int damage) {
 }
 
 Wall::Wall(Point pos) : Character(pos){
-	_symbol = "#";
-	_hp = INT16_MAX;  
-	_mp = 0;
-	_dmg = 0;
-	_isPlayable = false;
+	string s = config.configJson["Wall"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Wall"]["hp"];
+	_mp = config.configJson["Wall"]["mp"];
+	_dmg = config.configJson["Wall"]["dmg"];
+	_isPlayable = config.configJson["Wall"]["isPlayable"];
 }
 
 Movable::Movable(Point pos) :
@@ -155,7 +163,7 @@ void Movable::Move(Level &level) {
 	if (level.map[_position.x + direction.x][_position.y + direction.y]->IsDead()) {
 		level.map[_position.x + direction.x][_position.y + direction.y] = make_shared<Floor>();
 	}
-	if (level.map[_position.x + direction.x][_position.y + direction.y]->Symbol() == ".") {
+	if (level.map[_position.x + direction.x][_position.y + direction.y]->Symbol() == '.') {
 		std::swap(level.map[_position.x][_position.y], level.map[_position.x + direction.x][_position.y + direction.y]);
 		_position.x += direction.x;
 		_position.y += direction.y;
@@ -164,11 +172,12 @@ void Movable::Move(Level &level) {
 
 Knight::Knight(Point pos) :
 	Character(pos) {
-	_symbol = "K";
-	_hp = 300;  
-	_mp = 100;
-	_dmg = 50;
-	_isPlayable = true;
+	string s = config.configJson["Knight"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Knight"]["hp"];
+	_mp = config.configJson["Knight"]["mp"];
+	_dmg = config.configJson["Knight"]["dmg"];
+	_isPlayable = config.configJson["Knight"]["isPlayable"];
 	_direction = Point(0, 0);
 	_fireAtCurrentTurn = false;
 }
@@ -185,7 +194,7 @@ void Knight::Move(Level &level) {
 		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->IsDead()) {
 			level.map[_position.x + _direction.x][_position.y + _direction.y] = make_shared<Floor>();
 		}
-		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
+		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == '.') {
 			std::swap(level.map[_position.x][_position.y], level.map[_position.x + _direction.x][_position.y + _direction.y]);
 			_position.x += _direction.x;
 			_position.y += _direction.y;
@@ -218,11 +227,12 @@ void Knight::SetFire() {
 
 Princess::Princess(Point pos) :
 	Character(pos) {
-	_symbol = "P";
-	_hp = 100;   
-	_mp = 0;
-	_dmg = 0;
-	_isPlayable = true;
+	string s = config.configJson["Princess"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Princess"]["hp"];
+	_mp = config.configJson["Princess"]["mp"];
+	_dmg = config.configJson["Princess"]["dmg"];
+	_isPlayable = config.configJson["Princess"]["isPlayable"];
 }
 
 void Princess::Move(Level &level) {
@@ -234,20 +244,22 @@ Monster::Monster(Point pos) :
 
 Dragon::Dragon(Point pos) :
 	Monster(pos) {
-	_symbol = "D";
-	_hp = 1000;
-	_mp = 0;
-	_dmg = 5;
-	_isPlayable = true;
+	string s = config.configJson["Dragon"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Dragon"]["hp"];
+	_mp = config.configJson["Dragon"]["mp"];
+	_dmg = config.configJson["Dragon"]["dmg"];
+	_isPlayable = config.configJson["Dragon"]["isPlayable"];
 }
 
 Zombie::Zombie(Point pos) :
 	Monster(pos) {
-	_symbol = "Z";
-	_hp = 100;
-	_mp = 0;
-	_dmg = 2;
-	_isPlayable = true;
+	string s = config.configJson["Zombie"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Zombie"]["hp"];
+	_mp = config.configJson["Zombie"]["mp"];
+	_dmg = config.configJson["Zombie"]["dmg"];
+	_isPlayable = config.configJson["Zombie"]["isPlayable"];
 }
 
 Potion::Potion(Point pos) :
@@ -255,8 +267,12 @@ Potion::Potion(Point pos) :
 
 HealingPotion::HealingPotion(Point pos) :
 	Potion(pos) {
-	_hp = 50;
-	_symbol = "H";
+	string s = config.configJson["HealingPotion"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["HealingPotion"]["hp"];
+	_mp = config.configJson["HealingPotion"]["mp"];
+	_dmg = config.configJson["HealingPotion"]["dmg"];
+	_isPlayable = config.configJson["HealingPotion"]["isPlayable"];
 }
 
 Projectile::Projectile(Point pos, Point direction):
@@ -267,7 +283,7 @@ Character(pos){
 void Projectile::Move(Level &level) {
 	if ((_position.x + _direction.x < level.map.size()) && (_position.x + _direction.x >= 0) &&
 		(_position.y + _direction.y < level.map[0].size()) && (_position.y + _direction.y >= 0)) {
-		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == ".") {
+		if (level.map[_position.x + _direction.x][_position.y + _direction.y]->Symbol() == '.') {
 			std::swap(level.map[_position.x][_position.y], level.map[_position.x + _direction.x][_position.y + _direction.y]);
 			_position.x += _direction.x;
 			_position.y += _direction.y;
@@ -290,9 +306,12 @@ void Projectile::Move(Level &level) {
 
 Fireball::Fireball(Point pos, Point direction):
 Projectile(pos, direction){
-	_hp = 50;
-	_symbol = "*";
-	_isPlayable = true;
+	string s = config.configJson["Fireball"]["symbol"];
+	_symbol = s.c_str()[0];
+	_hp = config.configJson["Fireball"]["hp"];
+	_mp = config.configJson["Fireball"]["mp"];
+	_dmg = config.configJson["Fireball"]["dmg"];
+	_isPlayable = config.configJson["Fireball"]["isPlayable"];
 }
 
 void Character::Collide(Knight &other) {

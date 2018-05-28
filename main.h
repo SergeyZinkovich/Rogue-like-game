@@ -63,7 +63,7 @@ public:
 	virtual int ManaPoits() const;
 	virtual int Damage() const;
 	virtual Point Position() const;
-	virtual char* Symbol() const;
+	virtual char Symbol() const;
 	virtual bool IsDead() const;
 	virtual bool IsPlayable() const;
 	void TakeDamage(int damage);
@@ -79,7 +79,7 @@ public:
 protected:
 	bool _isDead;
 	bool _isPlayable;
-	char* _symbol = ".";
+	char _symbol = '.';
 	int _dmg;
 	int _hp;
 	int _mp;
@@ -205,7 +205,7 @@ public:
     template <class ActorT>
     void add_actor()
     {
-        constructors_[*ActorT(Point(0, 0)).Symbol()] = [](Point pos){return new ActorT(pos);};
+        constructors_[ActorT(Point(0, 0)).Symbol()] = [](Point pos){return new ActorT(pos);};
     }
 
     std::shared_ptr<BaseT> create(char symbol, Point pos)

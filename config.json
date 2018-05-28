@@ -1,0 +1,74 @@
+{
+ "Character":{
+	"hp" : 0,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : false,
+	"symbol" : " ",
+	"dmg" : 0
+ },
+  "Wall":{
+ 	"hp" : 0,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : false,
+	"symbol" : "#",
+	"dmg" : 0
+ },
+  "Floor":{
+ 	"hp" : 0,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : false,
+	"symbol" : ".",
+	"dmg" : 0
+ },
+  "Princess":{
+ 	"hp" : 100,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "P",
+	"dmg" : 0
+ },
+  "Knight":{
+ 	"hp" : 200,
+	"mp" : 100,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "K",
+	"dmg" : 50
+ },
+  "Zombie":{
+ 	"hp" : 100,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "Z",
+	"dmg" : 10
+ },
+  "Dragon":{
+ 	"hp" : 500,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "D",
+	"dmg" : 30
+ },
+  "FireBall":{
+ 	"hp" : 50,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "*",
+	"dmg" : 50
+ },
+   "HealingPotion":{
+ 	"hp" : 50,
+	"mp" : 0,
+	"isDead" : false, 
+	"isPlayable" : true,
+	"symbol" : "H",
+	"dmg" : 50
+ }
+}
