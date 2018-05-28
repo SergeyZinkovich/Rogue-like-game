@@ -339,7 +339,7 @@ void Knight::Collide(Character &other) {
 }
 
 void Knight::Collide(Monster &other) {
-	TakeDamage(_dmg);
+	TakeDamage(other.Damage());
 }
 
 void Knight::Collide(Princess &other) {
@@ -351,7 +351,7 @@ void Monster::Collide(Character &other) {
 }
 
 void Monster::Collide(Knight &other) {
-	TakeDamage(_dmg);
+	TakeDamage(other.Damage());
 }
 
 void Monster::Collide(Princess &other) {
