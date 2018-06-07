@@ -39,6 +39,7 @@ public:
 	vector<vector<shared_ptr<Character>>> map;
 	vector<shared_ptr<Character>> characterList;
 	shared_ptr<Knight> knightPointer;
+	shared_ptr<Princess> princessPointer;
 	vector<shared_ptr<Character>> projectilesList;
 private:
 	void AddCharacter(shared_ptr<Character> c);
@@ -49,7 +50,9 @@ public:
 	GameManager();
 	void ChangeKnightDirection(Point dir);
 	void Turn();
-	const void Draw();
+	void Draw() const;
+	void DrawField() const;
+	void DrawWin() const;
 	void SetKnightFire();
 private:
 	Level _level;
@@ -92,7 +95,7 @@ public:
 	void Collide(Character &other) override {}
 	void Collide(Knight &other) override {}
 	void Collide(Monster &other) override {}
-	void Collide(Projectile &other) override {}
+	void Collide(Projectile &other) override;
 };
 
 class Floor : public Character {
@@ -113,7 +116,7 @@ public:
 	void Collide(Character &other) override;
 	void Collide(Knight &other) override;
 	void Collide(Monster &other) override{}
-	void Collide(Projectile &other) override {}
+	void Collide(Projectile &other) override;
 };
 
 class HealingPotion : public Potion {
@@ -129,10 +132,10 @@ public:
 	void Move(Level &level);
 	void Collide(Character &other) override;
 	void Collide(Monster &other) override;
-	void Collide(Wall &other) override {}
-	void Collide(Princess &other) override {}
-	void Collide(Potion &other) override {}
-	void Collide(Projectile &other) override {}
+	void Collide(Wall &other) override { _isDead = true; }
+	void Collide(Princess &other) override { _isDead = true; }
+	void Collide(Potion &other) override { _isDead = true; }
+	void Collide(Projectile &other) override { _isDead = true; }
 protected:
 	Point _direction;
 };
@@ -162,6 +165,7 @@ public:
 	void SetFire();
 private:
 	Point _direction;
+	bool _passTurn;
 	bool _fireAtCurrentTurn;
 };
 
@@ -174,7 +178,11 @@ public:
 	void Collide(Floor &other) override {}
 	void Collide(Wall &other) override {}
 	void Move(Level &level) override;
-	void Collide(Projectile &other) override {}
+	void Collide(Projectile &other) override;
+	void SetReached();
+	bool ReachedByKnight() const;
+private:
+	bool _reachedByKnight;
 };
 
 class Monster : public Movable {

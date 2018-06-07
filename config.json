@@ -1,4 +1,9 @@
 {
+ "ButtonLeft": 119,
+ "ButtonRight": 115,
+ "ButtonUp": 100,
+ "ButtonDown": 97,
+ "ButtonFire": 32,
  "Character":{
 	"hp" : 0,
 	"mp" : 0,
@@ -55,7 +60,7 @@
 	"symbol" : "D",
 	"dmg" : 30
  },
-  "FireBall":{
+  "Fireball":{
  	"hp" : 50,
 	"mp" : 0,
 	"isDead" : false, 

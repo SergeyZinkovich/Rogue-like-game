@@ -3,6 +3,8 @@
 #include "configReader.cpp"
 #include <fstream>
 #include <string>
+#include <Windows.h>
+#include <thread>
 
 using std::vector;
 using std::make_shared;
@@ -24,9 +26,10 @@ void Level::AddCharacter(shared_ptr<Character> c) {
 Level::Level() {
 	std::ifstream file;
 	file.open("map.txt");
-	int height, width, knightX, knightY;
+	int height, width, knightX, knightY, princessX, princessY;
 	file >> height >> width;
 	file >> knightX >> knightY;
+	file >> princessX >> princessY;
 	map.resize(height, vector<shared_ptr<Character>>(width));
 	CharacterFactory factory;
 	char c;
@@ -36,6 +39,10 @@ Level::Level() {
 			if ((i == knightX - 1) && (j == knightY - 1)) {
 				knightPointer = make_shared<Knight>(Point(i, j));
 				map[i][j] = knightPointer;
+			}
+			else if ((i == princessX - 1) && (j == princessY - 1)) {
+				princessPointer = make_shared<Princess>(Point(i, j));
+				map[i][j] = princessPointer;
 			}
 			else {
 				map[i][j] = factory.create(c, Point(i, j));
@@ -64,7 +71,16 @@ void GameManager::Turn() {
 	}
 }
 
-const void GameManager::Draw() {
+void GameManager::Draw() const {
+	if (_level.princessPointer->ReachedByKnight()) {
+		DrawWin();
+	}
+	else {
+		DrawField();
+	}
+}
+
+void GameManager::DrawField() const {
 	clear();
 	char c[10];
 	sprintf(c, "%d", _level.knightPointer->HitPoints());
@@ -82,6 +98,12 @@ const void GameManager::Draw() {
 		}
 		printw("\n");
 	}
+	refresh();
+}
+
+void GameManager::DrawWin() const {
+	clear();
+	printw("You win");
 	refresh();
 }
 
@@ -179,6 +201,7 @@ Knight::Knight(Point pos) :
 	_dmg = config.configJson["Knight"]["dmg"];
 	_isPlayable = config.configJson["Knight"]["isPlayable"];
 	_direction = Point(0, 0);
+	_passTurn = true;
 	_fireAtCurrentTurn = false;
 }
 
@@ -188,6 +211,7 @@ void Knight::Move(Level &level) {
 		CreateFireball(level);
 		return;
 	}
+	if (_passTurn) { return; }
 	if ((_position.x + _direction.x < level.map.size()) && (_position.x + _direction.x >= 0) && 
 		(_position.y + _direction.y < level.map[0].size()) && (_position.y + _direction.y >= 0)) {
 			this->Collide(*level.map[_position.x + _direction.x][_position.y + _direction.y]);
@@ -200,10 +224,12 @@ void Knight::Move(Level &level) {
 			_position.y += _direction.y;
 		}
 	}
+	_passTurn = true;
 }
 
 void Knight::SetDirection(Point dir) {
 	_direction = dir;
+	_passTurn = false;
 }
 
 void Knight::CreateFireball(Level &level) {
@@ -211,7 +237,7 @@ void Knight::CreateFireball(Level &level) {
 	int y = _position.y + _direction.y;
 	if ((x < level.map.size()) && (x >= 0) && (y < level.map[0].size()) && (y >= 0)) {
 		level.projectilesList.push_back(make_shared<Fireball>(Point(x, y), _direction));
-		level.map[x][y]->Collide(*level.projectilesList.back());
+		level.projectilesList.back()->Collide(*level.map[x][y]);
 		if (level.map[x][y]->IsDead()) {
 			level.map[x][y] = make_shared<Floor>();
 		}
@@ -233,6 +259,15 @@ Princess::Princess(Point pos) :
 	_mp = config.configJson["Princess"]["mp"];
 	_dmg = config.configJson["Princess"]["dmg"];
 	_isPlayable = config.configJson["Princess"]["isPlayable"];
+	_reachedByKnight = false;
+}
+
+void Princess::SetReached() {
+	_reachedByKnight = true;
+}
+
+bool Princess::ReachedByKnight() const{
+	return _reachedByKnight;
 }
 
 void Princess::Move(Level &level) {
@@ -334,6 +369,10 @@ void Character::Collide(Projectile &other) {
 	other.Collide(*this);
 }
 
+void Wall::Collide(Projectile &other) {
+	other.Collide(*this);
+}
+
 void Knight::Collide(Character &other) {
 	other.Collide(*this);
 }
@@ -343,7 +382,7 @@ void Knight::Collide(Monster &other) {
 }
 
 void Knight::Collide(Princess &other) {
-	//Победа?
+	other.SetReached();
 }
 
 void Monster::Collide(Character &other) {
@@ -367,11 +406,15 @@ void Princess::Collide(Character &other) {
 }
 
 void Princess::Collide(Knight &other) {
-	//Если она не двигается, то у нее нет коллижинов?
+	SetReached();
 }
 
 void Princess::Collide(Monster &other) {
 	//Если она не двигается, то у нее нет коллижинов?
+}
+
+void Princess::Collide(Projectile &other) {
+	other.Collide(*this);
 }
 
 void Potion::Collide(Character &other) {
@@ -379,6 +422,10 @@ void Potion::Collide(Character &other) {
 }
 
 void Potion::Collide(Knight &other) {
+	other.Collide(*this);
+}
+
+void Potion::Collide(Projectile &other) {
 	other.Collide(*this);
 }
 
@@ -412,38 +459,37 @@ CharacterFactory::CharacterFactory() {
 
 int main() {  
 	initscr();
-	/*start_color();
-	init_pair(1, COLOR_RED, COLOR_BLACK);
-	init_pair(2, COLOR_WHITE, COLOR_BLACK);
-	attron(COLOR_PAIR(1));*/
 	GameManager g = GameManager();
 	g.Draw();
 	noecho();
 	raw();
-	while (true){
+	halfdelay(1);
+	std::chrono::duration<long, std::ratio<3, 30>> frame_ratio{ 1 };
+	while (true) {
+		auto frame_start = std::chrono::steady_clock::now();
 		int ch = getch();
 		if ((ch == 119) || (ch == 115) || (ch == 100) || (ch == 97) || (ch == 32)) {
-			switch (ch)
-			{
-			case 119:
+			if (ch == config.configJson["ButtonLeft"]) {
 				g.ChangeKnightDirection(Point(-1, 0));
-				break;
-			case 115:
-				g.ChangeKnightDirection(Point(1, 0));
-				break;
-			case 100:
-				g.ChangeKnightDirection(Point(0, 1));
-				break;
-			case 97:
-				g.ChangeKnightDirection(Point(0, -1));
-				break;
-			case 32:
-				g.SetKnightFire();
-				break;
 			}
-			g.Turn();
-			g.Draw();
+			if (ch == config.configJson["ButtonRight"]) {
+				g.ChangeKnightDirection(Point(1, 0));
+			}
+			if (ch == config.configJson["ButtonUp"]) {
+				g.ChangeKnightDirection(Point(0, 1));
+			}
+			if (ch == config.configJson["ButtonDown"]) {
+				g.ChangeKnightDirection(Point(0, -1));
+			}
+			if (ch == config.configJson["ButtonFire"]) {
+				g.SetKnightFire();
+			}
 		}
+		auto frame_end = std::chrono::steady_clock::now();
+		auto delay = frame_ratio - (frame_end - frame_start);
+		std::this_thread::sleep_for(delay);
+		g.Turn();
+		g.Draw();
 	}
 	endwin(); 
 
