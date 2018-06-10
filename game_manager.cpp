@@ -28,7 +28,10 @@ void GameManager::Turn() {
 }
 
 void GameManager::Draw() const {
-	if (_level.princessPointer->ReachedByKnight()) {
+	if (_level.knightPointer->IsDead()) {
+		DrawLoss();
+	}
+	else if (_level.princessPointer->ReachedByKnight()) {
 		DrawWin();
 	}
 	else {
@@ -60,6 +63,12 @@ void GameManager::DrawField() const {
 void GameManager::DrawWin() const {
 	clear();
 	printw("You win");
+	refresh();
+}
+
+void GameManager::DrawLoss() const {
+	clear();
+	printw("You are dead");
 	refresh();
 }
 

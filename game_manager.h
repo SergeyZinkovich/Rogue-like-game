@@ -12,6 +12,7 @@ public:
 	void Draw() const;
 	void DrawField() const;
 	void DrawWin() const;
+	void DrawLoss() const;
 	void SetKnightFire();
 private:
 	Level _level;
