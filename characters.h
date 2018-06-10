@@ -6,12 +6,14 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include "configReader.h"
+#include "point.h"
+#include "level.h"
 
 using std::vector;
 using std::shared_ptr;
 
 class Level;
-class GameManager;
 class Character;
 class Movable;
 class Knight;
@@ -26,14 +28,9 @@ class HealingPotion;
 class Projectile;
 class Fireball;
 
-class Point {
-public:
-	Point(){}
-	Point(int x0, int y0);
-	int x, y;
-};
+extern ConfigReader config;
 
-class Level {
+/*class Level {
 public:
 	Level();
 	vector<vector<shared_ptr<Character>>> map;
@@ -43,20 +40,7 @@ public:
 	vector<shared_ptr<Character>> projectilesList;
 private:
 	void AddCharacter(shared_ptr<Character> c);
-};
-
-class GameManager {
-public:
-	GameManager();
-	void ChangeKnightDirection(Point dir);
-	void Turn();
-	void Draw() const;
-	void DrawField() const;
-	void DrawWin() const;
-	void SetKnightFire();
-private:
-	Level _level;
-};
+};*/
 
 class Character {
 public:
@@ -115,7 +99,7 @@ public:
 	Potion(Point pos);
 	void Collide(Character &other) override;
 	void Collide(Knight &other) override;
-	void Collide(Monster &other) override{}
+	void Collide(Monster &other) override {}
 	void Collide(Projectile &other) override;
 };
 
@@ -204,29 +188,4 @@ public:
 class Zombie : public Monster {
 public:
 	Zombie(Point pos);
-};
-
-template <class BaseT>
-class BaseFactory
-{
-public:
-    template <class ActorT>
-    void add_actor()
-    {
-        constructors_[ActorT(Point(0, 0)).Symbol()] = [](Point pos){return new ActorT(pos);};
-    }
-
-    std::shared_ptr<BaseT> create(char symbol, Point pos)
-    {
-        return std::shared_ptr<BaseT>(constructors_[symbol](pos));
-    }
-
-private:
-    std::map<char, std::function<BaseT*(Point)>> constructors_;
-};
-
-class CharacterFactory : public BaseFactory<Character>
-{
-public:
-	explicit CharacterFactory();
 };
